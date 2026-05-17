@@ -1,0 +1,5 @@
+# No external dependencies required!
+# Uses only Python standard library
+
+# Optional for enhanced features
+# requests>=2.25.0
