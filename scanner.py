@@ -14,7 +14,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 class GitHubSecurityScanner:
-    VERSION = "1.0.0"
+    VERSION = "1.1.0"
     
     # Security patterns to detect
     PATTERNS = {
@@ -57,6 +57,191 @@ class GitHubSecurityScanner:
             "pattern": r'(md5|sha1)\s*\(',
             "severity": "LOW",
             "description": "Weak hash algorithm"
+        },
+        "command_injection": {
+            "pattern": r'(os\.system\(|subprocess\.call\(.*shell\s*=\s*True|subprocess\.run\(.*shell\s*=\s*True|eval\()',
+            "severity": "CRITICAL",
+            "description": "Command injection via shell execution"
+        },
+        "path_traversal": {
+            "pattern": r'(open\(.*\+.*\)|\.\./|\.\.\\\\|path\.join\(.*req\.)|send_file\(.*\+.*\))',
+            "severity": "HIGH",
+            "description": "Potential path traversal"
+        },
+        "xxe": {
+            "pattern": r'(xml\.etree\.ElementTree\.parse|lxml\.etree\.parse|DocumentBuilderFactory|SAXParserFactory)',
+            "severity": "HIGH",
+            "description": "Potential XXE - XML external entity"
+        },
+        "insecure_cookie": {
+            "pattern": r'(Set-Cookie.*(?!Secure)(?!HttpOnly)|cookie.*secure\s*=\s*False|SESSION_COOKIE_SECURE\s*=\s*False)',
+            "severity": "MEDIUM",
+            "description": "Insecure cookie settings"
+        },
+        "hardcoded_ip": {
+            "pattern": r'\b(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b',
+            "severity": "INFO",
+            "description": "Hardcoded IP address"
+        },
+        "sensitive_file": {
+            "pattern": r'(\.env|\.htaccess|\.git/config|\.ssh/id_rsa|\.aws/credentials|secrets\.json|config\.json)',
+            "severity": "MEDIUM",
+            "description": "Reference to sensitive file"
+        },
+        "jwt_none_alg": {
+            "pattern": r'(algorithm\s*=\s*["\']none["\']|alg\s*:\s*["\']none["\'])',
+            "severity": "CRITICAL",
+            "description": "JWT with none algorithm - authentication bypass"
+        },
+        "unsafe_file_upload": {
+            "pattern": r'(multipart\.form\.get\(|request\.files\[|FileUpload|\.save\(.*request)',
+            "severity": "HIGH",
+            "description": "Unsafe file upload handling"
+        },
+        "ldap_injection": {
+            "pattern": r'(ldap.*search\(.*\+|ldap.*filter\(.*\+|DirectorySearcher\()',
+            "severity": "HIGH",
+            "description": "Potential LDAP injection"
+        },
+        "nosql_injection": {
+            "pattern": r'(find\(\{.*\$where.*\}|find\(\{.*\$regex.*\}|\.find\(.*req\.)',
+            "severity": "HIGH",
+            "description": "Potential NoSQL injection"
+        },
+        "open_redirect": {
+            "pattern": r'(redirect\(.*req\.|Location\s*:\s*.*\+|window\.location\s*=\s*.*\+)',
+            "severity": "MEDIUM",
+            "description": "Potential open redirect"
+        },
+        "mass_assignment": {
+            "pattern": r'(params\[:.*\]|req\.body\.|update_attributes\(|update\(.*params)',
+            "severity": "MEDIUM",
+            "description": "Potential mass assignment vulnerability"
+        },
+        "timing_attack": {
+            "pattern": r'(==\s*.*password|==\s*.*secret|==\s*.*token|compare\s*.*==)',
+            "severity": "LOW",
+            "description": "Potential timing attack - string comparison"
+        },
+        "log_injection": {
+            "pattern": r'(log\(.*\+|logger\(.*\+|console\.log\(.*req\.)',
+            "severity": "LOW",
+            "description": "Potential log injection"
+        },
+        "prototype_pollution": {
+            "pattern": r'(Object\.assign\(|__proto__|constructor\.prototype|\.merge\()',
+            "severity": "HIGH",
+            "description": "Potential prototype pollution"
+        },
+        "regex_dos": {
+            "pattern": r'(re\.search\(.*\(.*\*|re\.match\(.*\(.*\*|RegExp\(.*\(.*\*)',
+            "severity": "MEDIUM",
+            "description": "Potential ReDoS - regex denial of service"
+        },
+        "unsafe_dynamic_import": {
+            "pattern": r'(import\(.*\+|require\(.*\+|__import__\(.*\+|load_module\()',
+            "severity": "HIGH",
+            "description": "Unsafe dynamic import"
+        },
+        "memory_unsafe": {
+            "pattern": r'(strcpy\(|strcat\(|sprintf\(|gets\(|memcpy\(|memmove\()',
+            "severity": "CRITICAL",
+            "description": "Memory unsafe function (C/C++)"
+        },
+        "buffer_overflow": {
+            "pattern": r'(malloc\(|alloca\(|realloc\(|strncpy\(.*\d+\))',
+            "severity": "HIGH",
+            "description": "Potential buffer overflow"
+        },
+        "integer_overflow": {
+            "pattern": r'(int.*\*.*int|short.*\*.*short|long.*\*.*long)',
+            "severity": "MEDIUM",
+            "description": "Potential integer overflow"
+        },
+        "race_condition": {
+            "pattern": r'(fopen\(.*["\']w|open\(.*O_RDWR|File\.createNewFile\()',
+            "severity": "MEDIUM",
+            "description": "Potential race condition (TOCTOU)"
+        },
+        "information_disclosure": {
+            "pattern": r'(stacktrace|traceback|Exception\(|Error\(|\.printStackTrace\()',
+            "severity": "LOW",
+            "description": "Information disclosure via error messages"
+        },
+        "insecure_ssl": {
+            "pattern": r'(verify\s*=\s*False|verify_ssl\s*=\s*False|ssl_verify\s*=\s*False|NODE_TLS_REJECT_UNAUTHORIZED.*0)',
+            "severity": "HIGH",
+            "description": "SSL/TLS certificate verification disabled"
+        },
+        "weak_crypto": {
+            "pattern": r'(DES|3DES|RC4|Blowfish|ECB mode|CBC mode)',
+            "severity": "MEDIUM",
+            "description": "Weak cryptographic algorithm"
+        },
+        "ssti": {
+            "pattern": r'(render_template_string\(|render_template\(.*\+|\.render\(.*req\.|\.template\(.*\+)',
+            "severity": "HIGH",
+            "description": "Potential SSTI - server-side template injection"
+        },
+        "csrf_missing": {
+            "pattern": r'(form.*method\s*=\s*["\']post["\']|@app\.route.*methods.*POST|router\.post\()',
+            "severity": "MEDIUM",
+            "description": "Form without CSRF protection (check manually)"
+        },
+        "clickjacking": {
+            "pattern": r'(X-Frame-Options|frame-ancestors|iframe.*src)',
+            "severity": "LOW",
+            "description": "Clickjacking protection (check manually)"
+        },
+        "hsts_missing": {
+            "pattern": r'(Strict-Transport-Security|max-age)',
+            "severity": "INFO",
+            "description": "HSTS header (check manually)"
+        },
+        "content_type_missing": {
+            "pattern": r'(Content-Type|X-Content-Type-Options)',
+            "severity": "INFO",
+            "description": "Content-Type security headers (check manually)"
+        },
+        "xpath_injection": {
+            "pattern": r'(xpath\(.*\+|evaluate\(.*\+|selectNodes\(.*\+)',
+            "severity": "HIGH",
+            "description": "Potential XPath injection"
+        },
+        "graphql_injection": {
+            "pattern": r'(graphql\(.*\+|query\s*\{.*\$|mutation\s*\{.*\$)',
+            "severity": "MEDIUM",
+            "description": "Potential GraphQL injection"
+        },
+        "api_key_exposure": {
+            "pattern": r'(api[_-]?key\s*[:=]\s*["\'][^"\']{16,}["\']|apikey\s*[:=]\s*["\'][^"\']{16,}["\'])',
+            "severity": "CRITICAL",
+            "description": "API key exposed in code"
+        },
+        "db_connection_string": {
+            "pattern": r'(mongodb(\+srv)?://|postgres(ql)?://|mysql://|redis://|connection_string)',
+            "severity": "CRITICAL",
+            "description": "Database connection string exposed"
+        },
+        "aws_key": {
+            "pattern": r'(AKIA[0-9A-Z]{16}|aws_access_key_id|aws_secret_access_key)',
+            "severity": "CRITICAL",
+            "description": "AWS credentials exposed"
+        },
+        "github_token": {
+            "pattern": r'(gh[pousr]_[A-Za-z0-9_]{36,}|github[_-]?token)',
+            "severity": "CRITICAL",
+            "description": "GitHub token exposed"
+        },
+        "private_key": {
+            "pattern": r'(BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY|BEGIN SSH2 ENCRYPTED PRIVATE KEY)',
+            "severity": "CRITICAL",
+            "description": "Private key exposed"
+        },
+        "todo_fixme": {
+            "pattern": r'(TODO.*fix|FIXME.*security|HACK.*|XXX.*|BUG.*)',
+            "severity": "INFO",
+            "description": "TODO/FIXME comment - may indicate unfinished security work"
         }
     }
     
