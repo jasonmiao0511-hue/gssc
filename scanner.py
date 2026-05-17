@@ -14,7 +14,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 class GitHubSecurityScanner:
-    VERSION = "1.1.0"
+    VERSION = "1.2.0"
     
     # Security patterns to detect
     PATTERNS = {
@@ -242,6 +242,130 @@ class GitHubSecurityScanner:
             "pattern": r'(TODO.*fix|FIXME.*security|HACK.*|XXX.*|BUG.*)',
             "severity": "INFO",
             "description": "TODO/FIXME comment - may indicate unfinished security work"
+        },
+        # Go specific
+        "go_sql_injection": {
+            "pattern": r'(db\.Query\(.*\+|db\.Exec\(.*\+|QueryContext\(.*\+|ExecContext\(.*\+)',
+            "severity": "HIGH",
+            "description": "Potential SQL injection in Go"
+        },
+        "go_path_traversal": {
+            "pattern": r'(http\.ServeFile\(.*\+|os\.Open\(.*\+|ioutil\.ReadFile\(.*\+)',
+            "severity": "HIGH",
+            "description": "Potential path traversal in Go"
+        },
+        "go_command_injection": {
+            "pattern": r'(exec\.Command\(|exec\.CommandContext\(|os\.StartProcess\()',
+            "severity": "CRITICAL",
+            "description": "Command execution in Go"
+        },
+        "go_crypto_weak": {
+            "pattern": r'(des\.NewCipher|rc4\.New|md5\.Sum|sha1\.Sum)',
+            "severity": "MEDIUM",
+            "description": "Weak cryptography in Go"
+        },
+        "go_tls_insecure": {
+            "pattern": r'(InsecureSkipVerify:\s*true|tls\.Config\{.*InsecureSkipVerify)',
+            "severity": "HIGH",
+            "description": "TLS certificate verification skipped in Go"
+        },
+        "go_race_condition": {
+            "pattern": r'(sync\.Mutex|sync\.RWMutex|atomic\.)',
+            "severity": "INFO",
+            "description": "Concurrency primitive used (check for race conditions)"
+        },
+        "go_error_handling": {
+            "pattern": r'(_\s*,\s*err\s*:=|err\s*:=\s*.*\n\s*if\s+err\s*!=\s*nil)',
+            "severity": "INFO",
+            "description": "Error handling pattern (check for ignored errors)"
+        },
+        # Rust specific
+        "rust_unsafe": {
+            "pattern": r'unsafe\s*\{',
+            "severity": "MEDIUM",
+            "description": "Unsafe block in Rust"
+        },
+        "rust_panic": {
+            "pattern": r'(panic!\(|\.unwrap\(\)|\.expect\()',
+            "severity": "LOW",
+            "description": "Potential panic in Rust"
+        },
+        "rust_raw_pointer": {
+            "pattern": r'\*const\s+|\*mut\s+',
+            "severity": "MEDIUM",
+            "description": "Raw pointer usage in Rust"
+        },
+        "rust_sqlx_injection": {
+            "pattern": r'(sqlx::query\(|query_as!\(|query!\()',
+            "severity": "HIGH",
+            "description": "SQLx query (check for parameterized queries)"
+        },
+        "rust_command": {
+            "pattern": r'(std::process::Command|Command::new)',
+            "severity": "HIGH",
+            "description": "Command execution in Rust"
+        },
+        "rust_deserialize": {
+            "pattern": r'(serde_json::from_str|serde::Deserialize)',
+            "severity": "MEDIUM",
+            "description": "Deserialization in Rust (check for untrusted input)"
+        },
+        "rust_env_secrets": {
+            "pattern": r'(env::var\(|dotenv\(|std::env)',
+            "severity": "INFO",
+            "description": "Environment variable access (check for secrets)"
+        },
+        # Java specific
+        "java_reflection": {
+            "pattern": r'(Class\.forName|\.getMethod\(|\.invoke\(|Reflection)',
+            "severity": "MEDIUM",
+            "description": "Reflection usage in Java"
+        },
+        "java_deserialization": {
+            "pattern": r'(ObjectInputStream|readObject\(|\.deserialize\()',
+            "severity": "HIGH",
+            "description": "Java deserialization"
+        },
+        "java_script_engine": {
+            "pattern": r'(ScriptEngine|eval\(|ScriptEngineManager)',
+            "severity": "HIGH",
+            "description": "Script engine execution in Java"
+        },
+        "java_sql": {
+            "pattern": r'(Statement\.execute|createStatement\(|prepareStatement\(.*\+)',
+            "severity": "HIGH",
+            "description": "Potential SQL injection in Java"
+        },
+        "java_file_upload": {
+            "pattern": r'(MultipartFile|@RequestParam.*Multipart|FileItem)',
+            "severity": "MEDIUM",
+            "description": "File upload handling in Java"
+        },
+        # JavaScript/Node specific
+        "js_eval": {
+            "pattern": r'(eval\(|Function\(|setTimeout\(.*\+|setInterval\(.*\+)',
+            "severity": "HIGH",
+            "description": "Dynamic code execution in JS"
+        },
+        "js_child_process": {
+            "pattern": r'(child_process|exec\(|execSync\(|spawn\()',
+            "severity": "CRITICAL",
+            "description": "Command execution in Node.js"
+        },
+        "js_sqlite": {
+            "pattern": r'(db\.run\(.*\+|db\.get\(.*\+|db\.all\(.*\+)',
+            "severity": "HIGH",
+            "description": "Potential SQL injection in SQLite"
+        },
+        "js_xss": {
+            "pattern": r'(innerHTML\s*=|document\.write\(|\.html\(.*\+|dangerouslySetInnerHTML)',
+            "severity": "HIGH",
+            "description": "Potential XSS in JavaScript"
+        },
+        "js_local_storage": {
+            "pattern": r'(localStorage\.setItem\(|sessionStorage\.setItem\()',
+            "severity": "LOW",
+            "description": "Client-side storage (check for sensitive data)"
         }
     }
     
@@ -322,7 +446,7 @@ class GitHubSecurityScanner:
         path = Path(self.local_path)
         
         # Supported file extensions
-        extensions = {'.py', '.js', '.ts', '.go', '.java', '.rb', '.php', '.c', '.cpp', '.h'}
+        extensions = {'.py', '.js', '.ts', '.go', '.rs', '.java', '.rb', '.php', '.c', '.cpp', '.h'}
         
         print(f"[*] Scanning {self.local_path}...")
         
@@ -449,10 +573,12 @@ class GitHubSecurityScanner:
         report = self.generate_report()
         print("\n" + report)
         
-        # Save report
+        # Check for critical issues
         report_file = f"gssc_report_{int(datetime.now().timestamp())}.json"
         if self.output_format == "table":
             report_file = report_file.replace('.json', '.txt')
+        elif self.output_format == "sarif":
+            report_file = "gssc-results.sarif"
             
         with open(report_file, 'w') as f:
             f.write(report)
